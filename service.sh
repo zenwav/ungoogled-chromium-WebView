@@ -1,3 +1,2 @@
-MODDIR=${0%/*}
-
-chmod 0755 $MODDIR/bin/curl
+#!/system/bin/sh
+# This script will be executed in late_start service mode.

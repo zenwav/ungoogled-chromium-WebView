@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*$py.class
+release_assets/
+*.tar.zst
+.DS_Store
+Thumbs.db

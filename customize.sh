@@ -1,5 +1,5 @@
 [[ $API -ge 29 ]] || abort "Android 10+ required"
-[[ "$ARCH" = "arm" || "$ARCH" = "arm64" ]] || abort "Unsupported CPU architecture"
+[[ "$ARCH" = "arm64" ]] || abort "Only arm64 architecture is supported"
 
 for part in product vendor system_ext; do
   src=$MODPATH/$part
@@ -13,9 +13,7 @@ done
 . $MODPATH/common/install.sh
 
 echo "After installation, go to:"
-echo "1°) Settings"
-echo "2°) Developer options" 
-echo "3°) WebView implementation"
-echo "4°) Click on Vanadium WebView"
-echo "5°) Enjoy it"
+echo "1) Settings -> Developer options"
+echo "2) WebView implementation"
+echo "3) Select Ungoogled Chromium WebView"
 echo

@@ -1,3 +1,5 @@
+#!/system/bin/sh
+
 waitUntilBootCompleted() {
     resetprop -w sys.boot_completed 0 && return
     while [[ $(getprop sys.boot_completed) -eq 0 ]]; do
@@ -6,9 +8,9 @@ waitUntilBootCompleted() {
 }
 
 (
-waitUntilBootCompleted
-sleep 3
-pm uninstall app.vanadium.browser 2>/dev/null
-pm uninstall app.vanadium.webview 2>/dev/null
-pm uninstall app.vanadium.trichromelibrary 2>/dev/null
+    waitUntilBootCompleted
+    sleep 3
+    pm uninstall com.android.webview 2>/dev/null
+    pm uninstall org.chromium.trichromelibrary 2>/dev/null
 ) &
+

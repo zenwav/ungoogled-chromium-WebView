@@ -1,6 +1,6 @@
-id=Vanadium-WebViewBrowser
-name=Vanadium WebView & Vanadium Browser Installer
-version=v1.2.0
-versionCode=120
-author=None Baiano
-description=Change your system WebView with Vanadium WebView and installs Vanadium Browser.
+id=ungoogled-chromium-WebView
+name=Ungoogled Chromium WebView Installer
+version=150.0.7871.114-1
+versionCode=15007871
+author=zenwav
+description=Replaces system WebView with Ungoogled Chromium Trichrome WebView.

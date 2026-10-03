@@ -1,0 +1,96 @@
+name: 'Build Stage'
+description: 'Restores build tree, runs compilation under budget, exports or signs'
+
+inputs:
+  source_run_id:
+    required: false
+    default: ''
+  keystore_b64:
+    required: false
+  keystore_pass:
+    required: false
+  upstream_tag:
+    required: true
+
+outputs:
+  status:
+    value: ${{ steps.build.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare runner
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+      run: bash .github/scripts/hosted-prepare.sh
+
+    - name: Restore build tree
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+        SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        GH_TOKEN: ${{ github.token }}
+      run: bash .github/scripts/hosted-import.sh
+
+    - name: Fix WebView SafeBrowsing and Prefetch stubs if present
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+      run: python3 .github/scripts/patch-webview-fixes.py "${UGC_WORK:-/mnt/ugc}"
+
+    - name: Build
+      id: build
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+        NINJA_TIMEOUT: '19200s'
+        DEBIAN_FRONTEND: noninteractive
+      run: >
+        bash .github/scripts/hosted-build.sh --install-deps --resume
+        --arch arm64 --target trichrome_webview_target
+
+    - name: Pack build tree
+      if: steps.build.outputs.status == 'running' || failure()
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+      run: bash .github/scripts/hosted-export.sh
+
+    - name: Save build tree
+      if: steps.build.outputs.status == 'running' || failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: build-tree-arm64
+        path: build-tree.tar.zst
+        retention-days: 3
+        overwrite: true
+        compression-level: 0
+
+    - name: Package & Sign Release
+      if: steps.build.outputs.status == 'completed'
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+        KEYSTORE_B64: ${{ inputs.keystore_b64 }}
+        KEYSTORE_PASS: ${{ inputs.keystore_pass }}
+        UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+        GH_TOKEN: ${{ github.token }}
+      run: bash .github/scripts/package-module.sh
+
+    - name: Pack build tree on failure
+      if: failure()
+      shell: bash
+      env:
+        UGC_WORK: /mnt/ugc
+      run: bash .github/scripts/hosted-export.sh
+
+    - name: Save build tree on failure
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: build-tree-arm64
+        path: build-tree.tar.zst
+        retention-days: 3
+        overwrite: true
+        compression-level: 0

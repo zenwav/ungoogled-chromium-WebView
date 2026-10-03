@@ -1,0 +1,29 @@
+name: Build Ungoogled Chromium WebView
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: 'Upstream release tag (e.g. 150.0.7871.114-1)'
+        required: true
+        default: '150.0.7871.114-1'
+      source_run_id:
+        description: 'Run ID to resume from (blank = new build)'
+        required: false
+        default: ''
+
+concurrency:
+  group: build-webview-arm64
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-relay.yml
+    secrets: inherit
+    with:
+      upstream_tag: ${{ inputs.upstream_tag }}
+      source_run_id: ${{ inputs.source_run_id }}

@@ -1,0 +1,39 @@
+name: Watch Upstream Releases
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      new_release: ${{ steps.check.outputs.new_release }}
+      upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash .github/scripts/watch-upstream.sh
+
+  trigger-build:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.new_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Trigger Build Workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.check-upstream.outputs.upstream_tag }}
+        run: |
+          gh workflow run build-webview.yml -f upstream_tag="$TAG"

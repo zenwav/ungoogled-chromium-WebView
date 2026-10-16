@@ -1,7 +1,7 @@
 id=Vanadium-WebView
 name=Vanadium WebView
 version=155.0.8059.84.0
-versionCode=26101601
+versionCode=26101610
 author=None Baiano, zenwav
 description=Change your system WebView with Vanadium WebView.
 updateJson=https://raw.githubusercontent.com/zenwav/ungoogled-chromium-WebView/vanadium/update.json

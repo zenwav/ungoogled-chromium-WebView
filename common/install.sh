@@ -30,26 +30,19 @@ dl() {
 local LOS=$(getprop | grep -o -c "lineage")
 
 if [[ $LOS -gt 0 ]]; then
-	TLP=/system/product/app/VanadiumTrichromeLibrary
 	WVP=/system/product/app/VanadiumWebView
 else
-	TLP=/system/app/VanadiumTrichromeLibrary
 	WVP=/system/app/VanadiumWebView
 fi
-mkdir -p "$MODPATH/$TLP" "$MODPATH/$WVP"
+mkdir -p "$MODPATH/$WVP"
 
-TRI_URL="https://gitlab.com/grapheneos/platform_external_vanadium/-/raw/17/prebuilt/arm64/TrichromeLibrary.apk"
-WEB_URL="https://gitlab.com/grapheneos/platform_external_vanadium/-/raw/17/prebuilt/arm64/TrichromeWebView.apk"
-
-ui_print "Installing TrichromeLibrary..."
-dl "$TRI_URL" "$MODPATH/$TLP/VanadiumTrichromeLibrary.apk" || abort "Download failed: TrichromeLibrary"
-su -c cp "$MODPATH/$TLP/VanadiumTrichromeLibrary.apk" /data/local/tmp
-su -c pm install --install-location 1 /data/local/tmp/VanadiumTrichromeLibrary.apk
+WEB_URL="https://gitlab.com/grapheneos/platform_external_vanadium/-/raw/17/prebuilt/arm64/VanadiumWebView.apk"
 
 ui_print "Installing Vanadium WebView..."
 dl "$WEB_URL" "$MODPATH/$WVP/VanadiumWebView.apk" || abort "Download failed: WebView"
 su -c cp "$MODPATH/$WVP/VanadiumWebView.apk" /data/local/tmp
 su -c pm install --install-location 1 /data/local/tmp/VanadiumWebView.apk
+su -c rm -f /data/local/tmp/VanadiumWebView.apk
 
 if [[ $LOS -gt 0 ]]; then
 	OVERLAY_PATH=system/product/overlay/

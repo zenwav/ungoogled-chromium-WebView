@@ -1,0 +1,172 @@
+name: Update & Release Vanadium WebView Module
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Force release even if version unchanged'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: vanadium
+          fetch-depth: 0
+
+      - name: Check latest upstream Vanadium prebuilt release
+        id: upstream
+        shell: bash
+        run: |
+          python3 - << 'EOF'
+          import urllib.request, json, re, sys, os
+          from datetime import datetime
+
+          req = urllib.request.Request(
+              'https://gitlab.com/api/v4/projects/grapheneos%2Fplatform_external_vanadium/repository/commits?ref_name=17&path=prebuilt/arm64',
+              headers={'User-Agent': 'vanadium-update-checker'}
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              commits = json.load(resp)
+
+          latest_ver = None
+          latest_date = None
+          commit_sha = None
+
+          for c in commits:
+              m = re.search(r'(\d+\.\d+\.\d+\.\d+(\.\d+)?)', c['title'])
+              if m:
+                  latest_ver = m.group(1)
+                  latest_date = c['committed_date']
+                  commit_sha = c['id']
+                  break
+
+          if not latest_ver:
+              print("::error::Could not find a version in recent GitLab commits")
+              sys.exit(1)
+
+          # Parse ISO date string to extract integer versionCode YYMMDDHH
+          clean_date = latest_date.split('.')[0]
+          dt = datetime.fromisoformat(clean_date)
+          vcode = int(dt.strftime('%y%m%d%H'))
+
+          print(f"Latest upstream version: {latest_ver}")
+          print(f"Calculated versionCode: {vcode}")
+          print(f"Commit SHA: {commit_sha}")
+
+          curr_vcode = 0
+          curr_ver = ""
+          if os.path.exists("update.json"):
+              try:
+                  with open("update.json", "r", encoding="utf-8") as f:
+                      data = json.load(f)
+                      curr_vcode = int(data.get("versionCode", 0))
+                      curr_ver = str(data.get("version", ""))
+              except Exception as e:
+                  print(f"Notice reading update.json: {e}")
+
+          print(f"Current repository version: {curr_ver} (versionCode: {curr_vcode})")
+
+          is_newer = (vcode > curr_vcode) or (latest_ver != curr_ver)
+          print(f"Update needed: {is_newer}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"upstream_version={latest_ver}\n")
+              out.write(f"version_code={vcode}\n")
+              out.write(f"commit_sha={commit_sha}\n")
+              out.write(f"is_newer={'true' if is_newer else 'false'}\n")
+          EOF
+
+      - name: Prepare module and update version files
+        if: inputs.force_release == true || steps.upstream.outputs.is_newer == 'true'
+        id: build_module
+        shell: bash
+        run: |
+          VERSION="${{ steps.upstream.outputs.upstream_version }}"
+          VCODE="${{ steps.upstream.outputs.version_code }}"
+          REPO="${{ github.repository }}"
+          MODULE_NAME="Vanadium-WebView-${VERSION}"
+          ZIP_NAME="${MODULE_NAME}.zip"
+
+          echo "Updating module.prop to version ${VERSION} (${VCODE})..."
+          sed -i "s|^version=.*|version=${VERSION}|" module.prop
+          sed -i "s|^versionCode=.*|versionCode=${VCODE}|" module.prop
+          sed -i "s|^updateJson=.*|updateJson=https://raw.githubusercontent.com/${REPO}/vanadium/update.json|" module.prop
+
+          echo "Updating update.json..."
+          cat << EOF > update.json
+          {
+            "version": "${VERSION}",
+            "versionCode": ${VCODE},
+            "zipUrl": "https://github.com/${REPO}/releases/download/v${VERSION}/${ZIP_NAME}",
+            "changelog": "https://gitlab.com/grapheneos/platform_external_vanadium/-/commits/17?ref_type=heads"
+          }
+          EOF
+
+          echo "Setting permissions..."
+          chmod 0755 bin/curl* common/install.sh customize.sh service.sh uninstall.sh META-INF/com/google/android/update-binary 2>/dev/null || true
+
+          echo "Packaging ${ZIP_NAME}..."
+          zip -r9 "${ZIP_NAME}" \
+            META-INF \
+            Overlay \
+            bin \
+            common \
+            customize.sh \
+            module.prop \
+            service.sh \
+            system \
+            uninstall.sh -x "*/.placeholder"
+
+          sha256sum "${ZIP_NAME}" > "${ZIP_NAME}.sha256"
+
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=${ZIP_NAME}" >> "$GITHUB_ENV"
+          echo "build_done=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version updates to repository
+        if: steps.build_module.outputs.build_done == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add module.prop update.json
+          git commit -m "chore(release): update Vanadium WebView to v${{ env.VERSION }}" || echo "No changes to commit"
+          git push origin vanadium
+
+      - name: Publish GitHub Release
+        if: steps.build_module.outputs.build_done == 'true'
+        uses: softprops/action-gh-release@v3.0.3
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Vanadium WebView v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.ZIP_NAME }}.sha256
+          body: |
+            ## Vanadium WebView Magisk/KernelSU Module
+
+            Automated release tracking upstream GrapheneOS Vanadium `17/prebuilt/arm64`.
+
+            - **Vanadium Version:** `${{ steps.upstream.outputs.upstream_version }}`
+            - **Target Architecture:** `arm64` (Monolithic standalone APK)
+            - **Upstream Commit:** [`${{ steps.upstream.outputs.commit_sha }}`](https://gitlab.com/grapheneos/platform_external_vanadium/-/commit/${{ steps.upstream.outputs.commit_sha }})
+
+            ### Installation & Updates
+            1. Flash this `.zip` via **KernelSU / KernelSU Next / Magisk / APatch**.
+            2. Open **Settings → Developer options → WebView implementation** and select **Vanadium WebView**.
+            3. Updates will automatically be detected and prompted inside KernelSU Manager via `updateJson`.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

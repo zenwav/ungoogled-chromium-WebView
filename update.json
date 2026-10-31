@@ -1,6 +1,6 @@
 {
-  "version": "156.0.8078.73.0",
-  "versionCode": 26102722,
-  "zipUrl": "https://github.com/zenwav/ungoogled-chromium-WebView/releases/download/v156.0.8078.73.0/Vanadium-WebView-156.0.8078.73.0.zip",
+  "version": "156.0.8078.79.0",
+  "versionCode": 26103013,
+  "zipUrl": "https://github.com/zenwav/ungoogled-chromium-WebView/releases/download/v156.0.8078.79.0/Vanadium-WebView-156.0.8078.79.0.zip",
   "changelog": "https://gitlab.com/grapheneos/platform_external_vanadium/-/commits/17?ref_type=heads"
 }
